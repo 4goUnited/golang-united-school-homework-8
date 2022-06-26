@@ -43,7 +43,7 @@ func List(fileName string, writer io.Writer) error {
 	return nil
 }
 
-func Add(args Arguments, inputId string, writer io.Writer) error {
+func Add(args Arguments, userInput User, writer io.Writer) error {
 	if args["item"] == "" {
 		return errors.New("-item flag has to be specified")
 	}
@@ -65,13 +65,14 @@ func Add(args Arguments, inputId string, writer io.Writer) error {
 	}
 
 	for _, u := range users {
-		if u.Id == inputId {
-			if _, err := writer.Write([]byte(fmt.Sprintf("Item with id %v already exists", inputId))); err != nil {
+		if u.Id == userInput.Id {
+			if _, err := writer.Write([]byte(fmt.Sprintf("Item with id %v already exists", u.Id))); err != nil {
 				return err
 			}
 			return nil
 		}
 	}
+
 	return nil
 }
 
@@ -82,6 +83,8 @@ func Perform(args Arguments, writer io.Writer) error {
 		if err := json.Unmarshal([]byte(args["item"]), &userInput); err != nil {
 			return err
 		}
+		//Don't forget to update ID after Unmarshal JSON, cause ID stores in item
+		args["id"] = userInput.Id
 	}
 
 	switch args["operation"] {
@@ -91,7 +94,7 @@ func Perform(args Arguments, writer io.Writer) error {
 			err := List(args["fileName"], writer)
 			return err
 		case "add":
-			err := Add(args, userInput.Id, writer)
+			err := Add(args, userInput, writer)
 			return err
 		case "findById":
 			//
