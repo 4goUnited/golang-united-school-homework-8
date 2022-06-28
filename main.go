@@ -12,14 +12,15 @@ import (
 type Arguments map[string]string
 
 type User struct {
-	Id string
-	Email string
-	Age int
+	Id string `json:"id"`
+	Email string `json:"email"`
+	Age int `json:"age"`
 }
 
 
 const filePerm = 0644
 
+//Open file(or create if not exists), read all that in there and output to writer
 func List(fileName string, writer io.Writer) error {
 	if fileName == "" {
 		return errors.New("-fileName flag has to be specified")
@@ -43,6 +44,7 @@ func List(fileName string, writer io.Writer) error {
 	return nil
 }
 
+//Add item (if not exists). Main idea was not to write all readed slice to file, but only one record.
 func Add(args Arguments, userInput User, writer io.Writer) error {
 	if args["item"] == "" {
 		return errors.New("-item flag has to be specified")
@@ -54,23 +56,60 @@ func Add(args Arguments, userInput User, writer io.Writer) error {
 	}
 	defer file.Close()
 
-	bytes, err := io.ReadAll(file)
+	stat, err := file.Stat()
 	if err != nil {
 		return err
 	}
 
 	var users []User
-	if err := json.Unmarshal(bytes, &users); err != nil {
+
+	//If file just created, need to adjust prfx to the start of the file
+	prfx := "["
+	if stat.Size() > 0 {
+
+	        bytes, err := io.ReadAll(file)
+	        if err != nil {
+			return err
+	        }
+
+	        if err := json.Unmarshal(bytes, &users); err != nil {
+			fmt.Println("here")
+			return err
+	        }
+
+		//Search if user is already exists
+	        for _, u := range users {
+			if u.Id == userInput.Id {
+				if _, err := writer.Write([]byte(fmt.Sprintf("Item with id %v already exists", u.Id))); err != nil {
+					return err
+				}
+				return nil
+			}
+	        }
+
+		//If no user exists, added it to the end of file
+		prfx = ",\n"
+		if _, err := file.Seek(-1, 2); err != nil {
+			return err
+		}
+
+	}
+
+	if _, err := file.WriteString(prfx); err != nil {
 		return err
 	}
 
-	for _, u := range users {
-		if u.Id == userInput.Id {
-			if _, err := writer.Write([]byte(fmt.Sprintf("Item with id %v already exists", u.Id))); err != nil {
-				return err
-			}
-			return nil
-		}
+	enc := json.NewEncoder(file)
+	if err := enc.Encode(userInput); err != nil {
+		return err
+	}
+
+	if _, err := file.Seek(-1, 2); err != nil {
+		return err
+	}
+
+	if _, err := file.WriteString("]"); err != nil {
+		return err
 	}
 
 	return nil
